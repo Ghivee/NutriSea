@@ -12,7 +12,7 @@ const AdminDataBalita = () => {
   const [selected, setSelected] = useState(null);
   const [patientMeds, setPatientMeds] = useState([]);
   const [patientLogs, setPatientLogs] = useState([]);
-  const [patientSymptoms, setPatientSymptoms] = useState([]); // This stores Tumbuh Kembang data now
+  const [patientSymptoms, setPatientSymptoms] = useState([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -59,19 +59,29 @@ const AdminDataBalita = () => {
 
   const saveMed = async (e) => {
     e.preventDefault();
-    if (!medForm.name?.trim()) { setError('Nama gummy wajib diisi.'); return; }
-    if (!medForm.dosage?.trim()) { setError('Dosis gummy wajib diisi.'); return; }
-    if (!medForm.frequency?.trim()) { setError('Frekuensi wajib diisi.'); return; }
-    if (!medForm.start_date) { setError('Tanggal mulai wajib diisi.'); return; }
+    
+    if (!medForm.name?.trim()) { setError('Nama NutriSea Gummy wajib diisi agar bunda tidak bingung.'); return; }
+    if (!medForm.dosage?.trim()) { setError('Dosis wajib diisi (misal: 1 Butir) untuk keamanan dosis balita.'); return; }
+    if (!medForm.frequency?.trim()) { setError('Frekuensi wajib diisi (misal: 1x Sehari) untuk pengingat otomatis.'); return; }
+    if (!medForm.start_date) { setError('Tanggal mulai program wajib ditentukan.'); return; }
+    if (!medForm.total_tablets || medForm.total_tablets <= 0) { setError('Total persediaan gummy harus lebih dari 0.'); return; }
+
     setSaving(true); setError('');
     try {
       const payload = {
-        ...medForm,
         user_id: selected.id,
-        prescribed_by: adminProfile?.id,
+        name: medForm.name,
+        dosage: medForm.dosage,
+        frequency: medForm.frequency,
+        instruction: medForm.instruction || '',
+        start_date: medForm.start_date,
+        end_date: medForm.end_date || null,
         total_tablets: Number(medForm.total_tablets) || 0,
         remaining_tablets: editMedId ? Number(medForm.remaining_tablets) : Number(medForm.total_tablets) || 0,
+        is_active: medForm.is_active ?? true,
+        schedule_times: medForm.schedule_times || ['08:00']
       };
+
       if (editMedId) {
         const { error } = await supabase.from('medications').update(payload).eq('id', editMedId);
         if (error) throw new Error('Gagal memperbarui jadwal: ' + error.message);
@@ -102,7 +112,6 @@ const AdminDataBalita = () => {
     } catch (err) { setError(err.message); }
   };
 
-  // Compute patient compliance %
   const patientCompliance = (() => {
     const startMonth = new Date(); startMonth.setDate(1); startMonth.setHours(0,0,0,0);
     const monthLogs = patientLogs.filter(l => new Date(l.taken_at) >= startMonth);
@@ -112,9 +121,25 @@ const AdminDataBalita = () => {
     return expected > 0 ? Math.min(Math.round((monthLogs.length / expected) * 100), 100) : 0;
   })();
 
-  const filtered = patients.filter(p =>
-    !search || p.full_name?.toLowerCase().includes(search.toLowerCase()) || p.email?.toLowerCase().includes(search.toLowerCase())
-  );
+  const [regionFilter, setRegionFilter] = useState({ province: '', city: '', district: '' });
+
+  const filtered = patients.filter(p => {
+    const matchesSearch = !search || 
+      p.full_name?.toLowerCase().includes(search.toLowerCase()) || 
+      p.child_name?.toLowerCase().includes(search.toLowerCase()) ||
+      p.email?.toLowerCase().includes(search.toLowerCase()) ||
+      p.nik_anak?.includes(search);
+    
+    const matchesProv = !regionFilter.province || p.province === regionFilter.province;
+    const matchesCity = !regionFilter.city || p.city === regionFilter.city;
+    const matchesDist = !regionFilter.district || p.district === regionFilter.district;
+
+    return matchesSearch && matchesProv && matchesCity && matchesDist;
+  });
+
+  const provinces = [...new Set(patients.map(p => p.province).filter(Boolean))].sort();
+  const cities = [...new Set(patients.filter(p => !regionFilter.province || p.province === regionFilter.province).map(p => p.city).filter(Boolean))].sort();
+  const districts = [...new Set(patients.filter(p => !regionFilter.city || p.city === regionFilter.city).map(p => p.district).filter(Boolean))].sort();
 
   const getInitials = n => n?.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase() || '?';
 
@@ -163,7 +188,7 @@ const AdminDataBalita = () => {
         {/* Tabs */}
         <div className="flex gap-1 bg-sky-100 p-1 rounded-2xl mb-5 overflow-x-auto hide-scrollbar">
           {[
-            { key: 'data', label: 'Identitas Bunda' },
+            { key: 'data', label: 'Rincian Profil Pengguna' },
             { key: 'pertumbuhan', label: `Pertumbuhan Anak (${patientSymptoms.length})` },
             { key: 'obat', label: `Jadwal Konsumsi (${patientMeds.length})` },
             { key: 'kepatuhan', label: `Log Kepatuhan (${patientLogs.length})` },
@@ -177,30 +202,39 @@ const AdminDataBalita = () => {
 
         {/* Tab: Data Pribadi */}
         {activeTab === 'data' && (
-          <div className="bg-white rounded-2xl p-6 border border-sky-100 space-y-3">
+          <div className="bg-white rounded-2xl p-6 border border-sky-100 grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-1 shadow-sm">
             {[
               { label: 'Nama Lengkap Bunda', value: selected.full_name },
-              { label: 'Email', value: selected.email },
+              { label: 'Email Pengguna', value: selected.email },
               { label: 'Nomor Telepon', value: selected.phone || '-' },
+              { label: 'NIK Anak', value: selected.nik_anak || '-' },
+              { label: 'Nama Anak', value: selected.child_name || '-' },
               { label: 'Jenis Kelamin Anak', value: selected.gender || '-' },
               { label: 'Tanggal Lahir Anak', value: selected.date_of_birth ? new Date(selected.date_of_birth).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }) : '-' },
+              { label: 'Berat Lahir', value: selected.birth_weight ? `${selected.birth_weight} kg` : '-' },
+              { label: 'Panjang Lahir', value: selected.birth_length ? `${selected.birth_length} cm` : '-' },
+              { label: 'Provinsi', value: selected.province || '-' },
+              { label: 'Kota / Kabupaten', value: selected.city || '-' },
+              { label: 'Kecamatan', value: selected.district || '-' },
+              { label: 'Desa / Kelurahan', value: selected.village || '-' },
+              { label: 'RT / RW', value: (selected.rt && selected.rw) ? `RT ${selected.rt} / RW ${selected.rw}` : '-' },
+              { label: 'Alergi', value: selected.allergy_info || 'Tidak ada' },
+              { label: 'Status Profil', value: selected.is_profile_complete ? 'Lengkap' : 'Belum Lengkap' },
               { label: 'Data Tercatat Sejak', value: new Date(selected.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }) },
             ].map(item => (
-              <div key={item.label} className="flex justify-between items-center py-2 border-b border-sky-50 last:border-0">
-                <span className="text-sm font-black text-slate-400">{item.label}</span>
+              <div key={item.label} className="flex justify-between items-center py-2.5 border-b border-sky-50 last:border-0 md:last:border-b">
+                <span className="text-[11px] font-black text-slate-400 uppercase tracking-wider">{item.label}</span>
                 <span className={`text-sm font-bold text-slate-800`}>{item.value}</span>
               </div>
             ))}
           </div>
         )}
 
-        {/* Tab: Pertumbuhan (Tumbuh Kembang) */}
         {activeTab === 'pertumbuhan' && (
           <div className="space-y-3">
             {patientSymptoms.length === 0 ? (
               <div className="text-center py-8 text-slate-400 font-bold">Belum ada jurnal pertumbuhan anak yang dicatat bunda.</div>
             ) : patientSymptoms.map(log => {
-              // Parse height and weight from notes
                const tbMatch = log.notes?.match(/TB:\s*(\d+(\.\d+)?)\s*cm/);
                const bbMatch = log.notes?.match(/BB:\s*(\d+(\.\d+)?)\s*kg/);
                const noteDetailsMatch = log.notes?.match(/Catatan:\s*(.*)/);
@@ -231,7 +265,6 @@ const AdminDataBalita = () => {
           </div>
         )}
 
-        {/* Tab: Jadwal Gummy */}
         {activeTab === 'obat' && (
           <div>
             <div className="flex justify-between items-center mb-4">
@@ -258,7 +291,6 @@ const AdminDataBalita = () => {
                     { label: 'Tanggal Mulai Diberikan', name: 'start_date', type: 'date', required: true },
                     { label: 'Tanggal Selesai Program', name: 'end_date', type: 'date' },
                     { label: 'Total Persediaan (Biji)', name: 'total_tablets', type: 'number', placeholder: '30' },
-                    { label: 'Catatan Kader', name: 'admin_notes', placeholder: 'Pesan kader ke bunda' },
                   ].map(f => (
                     <div key={f.name}>
                       <label className="text-xs font-black text-slate-500 uppercase tracking-wider mb-1 block">{f.label} {f.required && '*'}</label>
@@ -268,13 +300,34 @@ const AdminDataBalita = () => {
                     </div>
                   ))}
                 </div>
-                {/* Schedule times */}
-                <div>
-                  <label className="text-xs font-black text-slate-500 uppercase tracking-wider mb-2 block">Jam Pengingat Otomatis <span className="font-semibold normal-case">(jam, pisahkan koma)</span></label>
-                  <input type="text" value={medForm.schedule_times?.join(', ') || '08:00'}
-                    onChange={e => setMedForm(p => ({ ...p, schedule_times: e.target.value.split(',').map(t => t.trim()).filter(Boolean) }))}
-                    placeholder="08:00"
-                    className="w-full bg-white border-2 border-sky-100 rounded-xl px-3 py-2.5 text-slate-900 font-semibold text-sm focus:outline-none focus:border-sky-600" />
+                {/* Schedule times (Modern Input) */}
+                <div className="bg-white/50 p-4 rounded-xl border border-sky-100">
+                  <label className="text-xs font-black text-slate-500 uppercase tracking-wider mb-3 block flex justify-between items-center">
+                    Jam Pengingat Otomatis
+                    <button type="button" onClick={() => setMedForm(p => ({ ...p, schedule_times: [...(p.schedule_times || []), '08:00'] }))}
+                      className="text-[10px] bg-sky-600 text-white px-2 py-1 rounded-lg hover:bg-sky-700 transition flex items-center gap-1">
+                      <Plus size={10} /> TAMBAH JAM
+                    </button>
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {(medForm.schedule_times || ['08:00']).map((time, idx) => (
+                      <div key={idx} className="flex items-center gap-1 bg-white border border-sky-100 p-1.5 rounded-xl shadow-sm">
+                        <input type="time" value={time}
+                          onChange={e => {
+                            const newTimes = [...(medForm.schedule_times || ['08:00'])];
+                            newTimes[idx] = e.target.value;
+                            setMedForm(p => ({ ...p, schedule_times: newTimes }));
+                          }}
+                          className="text-xs font-bold text-slate-700 focus:outline-none" />
+                        {(medForm.schedule_times?.length > 1) && (
+                          <button type="button" onClick={() => setMedForm(p => ({ ...p, schedule_times: p.schedule_times.filter((_, i) => i !== idx) }))}
+                            className="text-red-400 hover:text-red-600 p-0.5">
+                            <X size={14} />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
                 </div>
                 {error && <Alert type="error" message={error} />}
                 <div className="flex gap-3">
@@ -333,7 +386,6 @@ const AdminDataBalita = () => {
           </div>
         )}
 
-        {/* Tab: Kepatuhan */}
         {activeTab === 'kepatuhan' && (
           <div>
             <div className="bg-gradient-to-br from-sky-50 to-sky-100 rounded-2xl p-4 mb-4 border border-sky-100 flex items-center gap-4">
@@ -364,7 +416,6 @@ const AdminDataBalita = () => {
           </div>
         )}
 
-        {/* Delete confirmation */}
         <Modal isOpen={!!deleteModal} onClose={() => setDeleteModal(null)} title="Hapus Jadwal?"
           footer={<><Button variant="secondary" onClick={() => setDeleteModal(null)}>Batal</Button><Button variant="danger" onClick={deleteMed}>Hapus</Button></>}>
           Jadwal konsumsi gummy ini akan dihapus permanen dan tidak bisa dikembalikan.
@@ -373,7 +424,6 @@ const AdminDataBalita = () => {
     );
   }
 
-  /* ─── Patient List ─── */
   return (
     <div>
       <div className="bg-gradient-to-br from-sky-600 to-cyan-500 rounded-2xl p-8 mb-6 shadow-nutrisea text-white">
@@ -387,54 +437,84 @@ const AdminDataBalita = () => {
 
       {error && <div className="mb-4"><Alert type="error" message={error} /></div>}
 
-      {/* Search */}
-      <div className="relative mb-5">
-        <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Cari nama bunda atau email..."
-          className="w-full bg-white border-2 border-sky-100 rounded-2xl pl-10 pr-4 py-3 text-slate-900 font-semibold text-sm focus:outline-none focus:border-sky-600" />
+      <div className="space-y-3 mb-6">
+        <div className="relative">
+          <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Cari nama bunda, nama anak, NIK, atau email..."
+            className="w-full bg-white border-2 border-sky-100 rounded-2xl pl-10 pr-4 py-3.5 text-slate-900 font-bold text-sm focus:outline-none focus:border-sky-600 shadow-nutrisea-sm" />
+        </div>
+        
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <select value={regionFilter.province} onChange={e => setRegionFilter({ province: e.target.value, city: '', district: '' })}
+            className="bg-white border-2 border-sky-50 rounded-xl px-4 py-2.5 text-xs font-bold text-slate-600 focus:outline-none focus:border-sky-600 shadow-sm cursor-pointer">
+            <option value="">Semua Provinsi</option>
+            {provinces.map(p => <option key={p} value={p}>{p}</option>)}
+          </select>
+          <select value={regionFilter.city} onChange={e => setRegionFilter({ ...regionFilter, city: e.target.value, district: '' })}
+            disabled={!regionFilter.province}
+            className="bg-white border-2 border-sky-50 rounded-xl px-4 py-2.5 text-xs font-bold text-slate-600 focus:outline-none focus:border-sky-600 shadow-sm cursor-pointer disabled:opacity-50">
+            <option value="">Semua Kota/Kab</option>
+            {cities.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+          <select value={regionFilter.district} onChange={e => setRegionFilter({ ...regionFilter, district: e.target.value })}
+            disabled={!regionFilter.city}
+            className="bg-white border-2 border-sky-50 rounded-xl px-4 py-2.5 text-xs font-bold text-slate-600 focus:outline-none focus:border-sky-600 shadow-sm cursor-pointer disabled:opacity-50">
+            <option value="">Semua Kecamatan</option>
+            {districts.map(d => <option key={d} value={d}>{d}</option>)}
+          </select>
+        </div>
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-2xl border border-sky-100 overflow-hidden shadow-card">
-        <table className="w-full">
-          <thead className="bg-sky-50">
-            <tr>
-              {['Identitas Bunda', 'Kontak', 'Pendaftaran', 'Aksi'].map(h => (
-                <th key={h} className="text-left px-5 py-3.5 text-[10px] font-black text-slate-500 uppercase tracking-widest">{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-sky-100">
-            {filtered.length === 0 ? (
-              <tr><td colSpan={4} className="px-5 py-10 text-center text-slate-400 font-bold">
-                {search ? `Tidak ada bunda dengan nama "${search}"` : 'Belum ada data bunda.'}
-              </td></tr>
-            ) : filtered.map(p => (
-              <tr key={p.id} className="hover:bg-sky-50/50 transition">
-                <td className="px-5 py-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-full bg-sky-100 flex items-center justify-center text-sky-600 font-black text-xs shrink-0">
-                      {getInitials(p.full_name)}
-                    </div>
-                    <div>
-                      <p className="font-bold text-slate-900 text-sm">{p.full_name || '-'}</p>
-                      <p className="text-xs text-slate-400 font-semibold">{p.gender ? `Anak: ${p.gender}` : '-'}</p>
-                    </div>
-                  </div>
-                </td>
-                <td className="px-5 py-4 text-sm text-slate-600 font-semibold">{p.phone || p.email?.split('@')[0]}</td>
-                <td className="px-5 py-4 text-xs text-slate-400 font-semibold">
-                  {new Date(p.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
-                </td>
-                <td className="px-5 py-4">
-                  <button onClick={() => selectPatient(p)} className="text-sky-600 font-bold text-sm hover:text-sky-700 flex items-center gap-1">
-                    Detail <ChevronRight size={14} />
-                  </button>
-                </td>
+      {/* Table */}
+      <div className="bg-white rounded-2xl border border-sky-100 shadow-card">
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[800px]">
+            <thead className="bg-sky-50">
+              <tr>
+                {['Data Pengguna & Anak', 'Kontak WhatsApp', 'NIK & Domisili', 'Aksi'].map(h => (
+                  <th key={h} className="text-left px-5 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">{h}</th>
+                ))}
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="divide-y divide-sky-100">
+              {filtered.length === 0 ? (
+                <tr><td colSpan={4} className="px-5 py-10 text-center text-slate-400 font-bold">
+                  {search ? `Tidak ada pengguna dengan nama "${search}"` : 'Belum ada data pengguna.'}
+                </td></tr>
+              ) : filtered.map(p => (
+                <tr key={p.id} className="hover:bg-sky-50/50 transition">
+                  <td className="px-5 py-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-2xl bg-sky-100 flex items-center justify-center text-sky-600 font-black text-xs shrink-0">
+                        {getInitials(p.child_name || p.full_name)}
+                      </div>
+                      <div>
+                        <p className="font-bold text-slate-900 text-sm">{p.child_name || 'Si Kecil'}</p>
+                        <p className="text-[10px] text-slate-400 font-bold uppercase">Bunda: {p.full_name || '-'}</p>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-5 py-4">
+                    <p className="text-sm text-slate-600 font-bold">{p.phone || '-'}</p>
+                    <p className="text-[10px] text-slate-400 font-semibold">{p.email}</p>
+                  </td>
+                  <td className="px-5 py-4">
+                    <p className="text-xs text-sky-600 font-black mb-0.5">NIK: {p.nik_anak || '-'}</p>
+                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tight">
+                      {p.desa ? `${p.desa} · RT ${p.rt}/RW ${p.rw}` : '-'}
+                    </p>
+                  </td>
+                  <td className="px-5 py-4">
+                    <button onClick={() => selectPatient(p)} className="text-sky-600 font-black text-xs hover:text-sky-700 flex items-center gap-1.5 bg-sky-50 px-3 py-2 rounded-xl transition-all">
+                      BUKA PROFIL <ChevronRight size={14} />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

@@ -29,16 +29,13 @@ const NutriBot = () => {
   const handleSend = () => {
     if (!input.trim()) return;
     
-    // Add User message
     const userMsg = { sender: 'user', text: input };
     setMessages(prev => [...prev, userMsg]);
     setInput('');
     setIsTyping(true);
 
-    // Simulate AI response
     setTimeout(() => {
       let replyIndex = Math.floor(Math.random() * predefinedResponses.length);
-      // primitive keyword matching
       const i = userMsg.text.toLowerCase();
       if(i.includes('ikan') || i.includes('gummy')) replyIndex = 2;
       else if(i.includes('protein') || i.includes('makan')) replyIndex = 1;

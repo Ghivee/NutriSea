@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LogOut, ChevronRight, Edit3, Save, X, Phone, LayoutDashboard, History, HelpCircle, Info, UserCircle2, Calendar, AlertTriangle } from 'lucide-react';
+import { LogOut, ChevronRight, Edit3, Save, X, Phone, LayoutDashboard, History, HelpCircle, Info, UserCircle2, Calendar, AlertTriangle, MapPin, Fingerprint, Baby, Ruler, Weight, Mail } from 'lucide-react';
 import { Header, CircularProgress, Button, InputField, Modal, Alert } from '../../components/UIComponents';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
@@ -11,27 +11,37 @@ const Profil = () => {
   const { profile, signOut, updateProfile, isAdmin } = useAuth();
   const navigate = useNavigate();
   const [editing, setEditing] = useState(false);
-  const [form, setForm] = useState({ full_name: '', phone: '', gender: '', allergy_info: '', date_of_birth: '' });
+  const [form, setForm] = useState({ 
+    child_name: '', nik_anak: '', phone: '', gender: '', allergy_info: '', 
+    date_of_birth: '', birth_weight: '', birth_length: '',
+    full_name: '', rt: '', rw: '', desa: '', city: '', province: '' 
+  });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   const [compliance, setCompliance] = useState({ percentage: 0, taken: 0, total: 0, streak: 0 });
-  const [recentLogs, setRecentLogs] = useState([]);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
-  const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [showAboutModal, setShowAboutModal] = useState(false);
 
   useEffect(() => {
     if (profile) {
       setForm({
-        full_name: profile.full_name || '',
+        child_name: profile.child_name || '',
+        nik_anak: profile.nik_anak || '',
         phone: profile.phone || '',
         gender: profile.gender || '',
         allergy_info: profile.allergy_info || '',
         date_of_birth: profile.date_of_birth || '',
+        birth_weight: profile.birth_weight || '',
+        birth_length: profile.birth_length || '',
+        full_name: profile.full_name || '',
+        rt: profile.rt || '',
+        rw: profile.rw || '',
+        desa: profile.desa || '',
+        city: profile.city || '',
+        province: profile.province || ''
       });
       fetchStats();
-      fetchLogs();
     }
   }, [profile]);
 
@@ -40,240 +50,193 @@ const Profil = () => {
     try {
       const startOfMonth = new Date(); startOfMonth.setDate(1); startOfMonth.setHours(0, 0, 0, 0);
       const dayOfMonth = new Date().getDate();
-
-      const [medsRes, logsRes] = await Promise.all([
-        supabase.from('medications').select('id').eq('user_id', profile.id).eq('is_active', true),
+      const [medRes, logsRes] = await Promise.all([
+        supabase.from('medications').select('id').eq('is_active', true).eq('user_id', profile.id),
         supabase.from('compliance_logs').select('taken_at').eq('user_id', profile.id).eq('status', 'taken').gte('taken_at', startOfMonth.toISOString())
       ]);
-      const totalMeds = medsRes.data?.length || 0;
+      const totalMeds = medRes.data?.length || 0;
       const taken = logsRes.data?.length || 0;
       const totalExpected = totalMeds * dayOfMonth;
       const pct = totalExpected > 0 ? Math.min(Math.round((taken / totalExpected) * 100), 100) : 0;
-
-      // Streak: count consecutive days with at least 1 log
-      let streak = 0;
-      if (logsRes.data?.length > 0) {
-        const dateSet = new Set(logsRes.data.map(l => new Date(l.taken_at).toDateString()));
-        const d = new Date();
-        while (dateSet.has(d.toDateString())) { streak++; d.setDate(d.getDate() - 1); }
-      }
-      setCompliance({ percentage: pct, taken, total: totalExpected, streak });
-    } catch (err) { console.error('Fetch stats error:', err); }
-  };
-
-  const fetchLogs = async () => {
-    if (!profile?.id) return;
-    try {
-      const { data } = await supabase
-        .from('compliance_logs').select('*, medications(name, dosage)')
-        .eq('user_id', profile.id).order('taken_at', { ascending: false }).limit(15);
-      if (data) setRecentLogs(data);
+      setCompliance(p => ({ ...p, percentage: pct, taken, total: totalExpected }));
     } catch (err) { console.error(err); }
   };
 
   const handleSave = async () => {
-    if (!form.full_name.trim()) { setError('Nama tidak boleh kosong.'); return; }
+    if (!form.child_name.trim()) { setError('Nama Si Kecil wajib diisi.'); return; }
     setLoading(true); setError('');
     try {
       await updateProfile({ ...form, is_profile_complete: true });
-      setSuccessMsg('Profil berhasil diperbarui!');
+      setSuccessMsg('Pembaruan Identitas Berhasil!');
       setEditing(false);
       setTimeout(() => setSuccessMsg(''), 3000);
     } catch (err) { setError(err.message); } finally { setLoading(false); }
   };
 
   const handleLogout = async () => {
-    try {
-      await signOut();
-      navigate('/login', { replace: true });
-    } catch { window.location.href = '/NutriSea-web/login'; }
+    try { await signOut(); navigate('/login', { replace: true }); }
+    catch { window.location.href = '/login'; }
   };
 
-  const handleWA = () => {
-    const msg = `Halo Admin Posyandu NutriSea, saya membutuhkan bantuan informasi kesehatan. Nama: ${profile?.full_name || '-'}`;
-    window.open(`https://wa.me/${WHATSAPP_SUPPORT}?text=${encodeURIComponent(msg)}`, '_blank');
-  };
-
-  const initials = profile?.full_name?.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase() || '?';
+  const initials = (profile?.child_name || profile?.full_name || '?').split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase();
   const compColor = compliance.percentage >= 80 ? '#0284c7' : compliance.percentage >= 50 ? '#d97706' : '#dc2626';
 
   return (
-    <div>
-      <Header title="Identitas Bunda" />
-      <div className="px-5 pb-10 space-y-4">
-        {/* Avatar */}
-        <div className="flex flex-col items-center py-5">
-          <div className="w-24 h-24 rounded-full bg-gradient-to-br from-sky-600 to-cyan-500 flex items-center justify-center text-white text-3xl font-black shadow-nutrisea mb-3">
-            {initials}
-          </div>
-          <h2 className="text-xl font-black text-slate-900">{profile?.full_name || 'Bunda Hebat'}</h2>
-          <p className="text-sm text-slate-500 font-bold">{profile?.email}</p>
-          {profile?.allergy_info && (
-            <div className="mt-2 bg-red-50 border border-red-200 px-3 py-1.5 rounded-xl flex items-center gap-1.5">
-              <AlertTriangle size={12} className="text-red-500" />
-              <span className="text-xs font-bold text-red-700">Alergi Anak: {profile.allergy_info}</span>
-            </div>
-          )}
-
-          {/* Streak badge */}
-          {compliance.streak > 0 && (
-            <div className="mt-2 bg-sky-100 border border-sky-300 px-3 py-1.5 rounded-xl flex items-center gap-1.5 shadow-sm">
-              <span className="text-sm">🔥</span>
-              <span className="text-xs font-black text-sky-600">{compliance.streak} hari konsisten!</span>
-            </div>
-          )}
+    <div className="bg-sky-50/30 min-h-full pb-24">
+      <Header title="Identitas NutriSea" />
+      <div className="px-5 pt-6 space-y-6">
+        
+        {/* AVATAR HERO */}
+        <div className="bg-white rounded-[2.5rem] p-8 border border-sky-100 shadow-nutrisea flex flex-col items-center text-center relative overflow-hidden">
+           <div className="absolute top-0 right-0 w-24 h-24 bg-sky-50 rounded-bl-[3rem] -z-0" />
+           <div className="w-24 h-24 rounded-[2rem] bg-gradient-to-br from-sky-600 to-cyan-400 flex items-center justify-center text-white text-3xl font-black shadow-nutrisea-sm mb-4 relative z-10">
+              {initials}
+           </div>
+           <h2 className="text-2xl font-black text-slate-900 mb-1">{profile?.child_name || 'Si Kecil'}</h2>
+           <p className="text-sky-500 font-black text-xs uppercase tracking-widest flex items-center gap-1.5">
+             <Fingerprint size={12} /> NIK: {profile?.nik_anak || '-'}
+           </p>
         </div>
 
         {successMsg && <Alert type="success" message={successMsg} />}
         {error && <Alert type="error" message={error} />}
 
-        {/* Compliance card */}
-        <div className="bg-white rounded-3xl p-5 border border-sky-100 shadow-card flex items-center gap-5">
-          <CircularProgress percentage={compliance.percentage} size={96} strokeWidth={9} color={compColor} />
-          <div className="flex-1">
-            <p className="font-black text-slate-900 text-base mb-1">Status Kepatuhan</p>
-            <p className="text-xs text-slate-500 font-semibold">{compliance.taken}/{compliance.total} gummy bulan ini</p>
-            <p className="text-xs font-black mt-1" style={{ color: compColor }}>
-              {compliance.percentage >= 80 ? '🌟 Luar Biasa!' : compliance.percentage >= 50 ? '👍 Cukup Baik' : '⚠️ Perlu Ditingkatkan'}
-            </p>
-            {compliance.streak > 1 && (
-              <p className="text-[10px] text-sky-600 font-black mt-0.5">🔥 {compliance.streak} hari beruntun</p>
-            )}
+        {/* STATS CARD */}
+        {!editing && (
+          <div className="grid grid-cols-2 gap-4">
+             <div className="bg-white rounded-3xl p-5 border border-sky-100 shadow-card">
+               <p className="text-[10px] font-black text-slate-400 uppercase mb-2">Disiplin Gizi</p>
+               <p className="text-3xl font-black text-sky-600">{compliance.percentage}%</p>
+               <p className="text-[10px] text-slate-400 font-bold">Bulan Ini</p>
+             </div>
+             <div className="bg-white rounded-3xl p-5 border border-sky-100 shadow-card">
+               <p className="text-[10px] font-black text-slate-400 uppercase mb-2">Total Gummy</p>
+               <p className="text-3xl font-black text-cyan-600">{compliance.taken}</p>
+               <p className="text-[10px] text-slate-400 font-bold">Butir Dikonsumsi</p>
+             </div>
           </div>
+        )}
+
+        {/* IDENTITAS UTAMA CARD */}
+        <div className="bg-white rounded-3xl p-6 border border-sky-100 shadow-card">
+           <div className="flex justify-between items-center mb-6">
+              <h3 className="font-black text-slate-900 flex items-center gap-2 text-lg">
+                <Baby size={20} className="text-sky-600" /> Profil Si Kecil
+              </h3>
+              <button onClick={() => setEditing(!editing)} className="w-10 h-10 rounded-xl bg-sky-50 flex items-center justify-center text-sky-600 hover:bg-sky-100 transition-all">
+                {editing ? <X size={20} /> : <Edit3 size={20} />}
+              </button>
+           </div>
+
+           {editing ? (
+             <div className="space-y-4">
+                <InputField label="Nama Lengkap Balita" icon={Baby} value={form.child_name} onChange={e => setForm(p => ({ ...p, child_name: e.target.value }))} />
+                <InputField label="NIK Anak" icon={Fingerprint} value={form.nik_anak} onChange={e => setForm(p => ({ ...p, nik_anak: e.target.value }))} maxLength={16} />
+                <div className="grid grid-cols-2 gap-4">
+                   <InputField label="BB Lahir (gram)" icon={Weight} type="number" value={form.birth_weight} onChange={e => setForm(p => ({ ...p, birth_weight: e.target.value }))} />
+                   <InputField label="PB Lahir (cm)" icon={Ruler} type="number" value={form.birth_length} onChange={e => setForm(p => ({ ...p, birth_length: e.target.value }))} />
+                </div>
+                <InputField label="Tanggal Lahir" icon={Calendar} type="date" value={form.date_of_birth} onChange={e => setForm(p => ({ ...p, date_of_birth: e.target.value }))} />
+                <InputField label="Info Alergi" icon={AlertTriangle} value={form.allergy_info} onChange={e => setForm(p => ({ ...p, allergy_info: e.target.value }))} />
+                
+                <h4 className="font-black text-slate-900 pt-4 border-t border-sky-50 flex items-center gap-2">
+                   <UserCircle2 size={18} className="text-sky-600" /> Profil Bunda
+                </h4>
+                <InputField label="Nama Lengkap Bunda" icon={UserCircle2} value={form.full_name} onChange={e => setForm(p => ({ ...p, full_name: e.target.value }))} />
+                <InputField label="WhatsApp" icon={Phone} value={form.phone} onChange={e => setForm(p => ({ ...p, phone: e.target.value }))} />
+                
+                <Button onClick={handleSave} disabled={loading} className="py-4 shadow-nutrisea text-sm">
+                   {loading ? 'Menyimpan...' : 'Perbarui Identitas NutriSea'}
+                </Button>
+             </div>
+           ) : (
+             <div className="space-y-4 divide-y divide-sky-50">
+                <div className="flex justify-between items-center py-2">
+                   <span className="text-xs font-black text-slate-400 uppercase">NIK Anak</span>
+                   <span className="text-sm font-black text-slate-900">{profile?.nik_anak || '-'}</span>
+                </div>
+                <div className="flex justify-between items-center py-2">
+                   <span className="text-xs font-black text-slate-400 uppercase">JK / Tgl Lahir</span>
+                   <span className="text-sm font-black text-slate-900">{profile?.gender || '-'} / {profile?.date_of_birth || '-'}</span>
+                </div>
+                <div className="flex justify-between items-center py-2">
+                   <span className="text-xs font-black text-slate-400 uppercase">BB / PB Lahir</span>
+                   <span className="text-sm font-black text-slate-900">{profile?.birth_weight || '-'} g / {profile?.birth_length || '-'} cm</span>
+                </div>
+                <div className="pt-2">
+                   <span className="text-xs font-black text-slate-400 uppercase block mb-1">Domisili</span>
+                   <p className="text-sm font-bold text-slate-900 flex items-start gap-2">
+                      <MapPin size={14} className="text-sky-600 mt-0.5 shrink-0" />
+                      {profile?.desa ? `RT ${profile.rt}/RW ${profile.rw}, ${profile.desa}, ${profile.district}, ${profile.city}` : '- Alamat belum diisi -'}
+                   </p>
+                </div>
+             </div>
+           )}
         </div>
 
-        {/* Data pribadi */}
-        <div className="bg-white rounded-3xl p-5 border border-sky-100 shadow-card">
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="font-black text-slate-900">Data Identitas Anak</h3>
-            <button onClick={() => { setEditing(!editing); setError(''); setSuccessMsg(''); }}
-              className="flex items-center gap-1 text-sky-600 font-bold text-sm">
-              {editing ? <><X size={14} />Batal</> : <><Edit3 size={14} />Edit</>}
-            </button>
+        {/* WALI CARD */}
+        {!editing && (
+          <div className="bg-white rounded-3xl p-6 border border-sky-100 shadow-card">
+              <h3 className="font-black text-slate-900 flex items-center gap-2 mb-4">
+                <UserCircle2 size={18} className="text-sky-600" /> Profil Bunda
+              </h3>
+              <div className="flex items-center justify-between mb-4">
+                 <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-sky-50 flex items-center justify-center text-sky-600 shadow-sm"><Mail size={18} /></div>
+                    <div><p className="text-[10px] font-black text-slate-400 uppercase">Email</p><p className="text-sm font-bold text-slate-900">{profile?.email}</p></div>
+                 </div>
+              </div>
+              <div className="flex items-center justify-between">
+                 <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-green-50 flex items-center justify-center text-green-600 shadow-sm"><Phone size={18} /></div>
+                    <div><p className="text-[10px] font-black text-slate-400 uppercase">Telepon</p><p className="text-sm font-bold text-slate-900">{profile?.phone || '-'}</p></div>
+                 </div>
+              </div>
           </div>
+        )}
 
-          {editing ? (
-            <div className="space-y-3">
-              {[
-                { label: 'Nama Lengkap Bunda', name: 'full_name', icon: UserCircle2, placeholder: 'Nama lengkap' },
-                { label: 'Telepon', name: 'phone', icon: Phone, placeholder: '08xxx', type: 'tel' },
-                { label: 'Info Alergi Anak', name: 'allergy_info', icon: AlertTriangle, placeholder: 'Misal: Seafood' },
-              ].map(f => (
-                <div key={f.name}>
-                  <label className="text-xs font-black text-slate-500 uppercase tracking-wider mb-1.5 block">{f.label}</label>
-                  <InputField icon={f.icon} name={f.name} placeholder={f.placeholder} type={f.type || 'text'}
-                    value={form[f.name] || ''} onChange={e => setForm(p => ({ ...p, [f.name]: e.target.value }))} />
+        {/* ACTION MENU */}
+        <div className="space-y-3 pb-4">
+           {isAdmin && (
+             <button onClick={() => navigate('/admin')} className="w-full bg-gradient-to-r from-sky-600 to-cyan-500 rounded-3xl p-5 text-white flex items-center justify-between shadow-nutrisea">
+                <div className="flex items-center gap-3 font-black uppercase text-xs tracking-widest">
+                   <div className="bg-white/20 p-2 rounded-xl"><LayoutDashboard size={18} /></div> Panel Admin Posyandu
                 </div>
-              ))}
-              <div>
-                <label className="text-xs font-black text-slate-500 uppercase tracking-wider mb-1.5 block">Jenis Kelamin Anak</label>
-                <select value={form.gender} onChange={e => setForm(p => ({ ...p, gender: e.target.value }))}
-                  className="w-full bg-white border-2 border-sky-100 rounded-2xl px-4 py-3 text-slate-900 font-semibold text-sm focus:outline-none focus:border-sky-600">
-                  <option value="">-- Pilih</option>
-                  <option value="Laki-laki">Laki-laki</option>
-                  <option value="Perempuan">Perempuan</option>
-                </select>
-              </div>
-              <div>
-                <label className="text-xs font-black text-slate-500 uppercase tracking-wider mb-1.5 block">Tanggal Lahir Anak</label>
-                <input type="date" value={form.date_of_birth || ''} onChange={e => setForm(p => ({ ...p, date_of_birth: e.target.value }))}
-                  className="w-full bg-white border-2 border-sky-100 rounded-2xl px-4 py-3 text-slate-900 font-semibold text-sm focus:outline-none focus:border-sky-600" />
-              </div>
-              <Button onClick={handleSave} disabled={loading}>
-                {loading ? <><span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />Menyimpan...</>
-                  : <><Save size={14} />Simpan Perubahan</>}
-              </Button>
-            </div>
-          ) : (
-            <div className="space-y-3 divide-y divide-sky-50">
-              {[
-                { label: 'Nama Bunda', value: profile?.full_name || '-', icon: UserCircle2 },
-                { label: 'Telepon', value: profile?.phone || '-', icon: Phone },
-                { label: 'JK Anak', value: profile?.gender || '-', icon: UserCircle2 },
-                { label: 'Lahir Anak', value: profile?.date_of_birth ? new Date(profile.date_of_birth).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }) : '-', icon: Calendar },
-                { label: 'Alergi', value: profile?.allergy_info || '-', icon: AlertTriangle, danger: !!profile?.allergy_info },
-              ].map(item => (
-                <div key={item.label} className="flex items-center justify-between py-2.5">
-                  <div className="flex items-center gap-2 text-slate-500 text-sm"><item.icon size={14} /><span className="font-bold">{item.label}</span></div>
-                  <span className={`text-sm font-bold ${item.danger ? 'text-red-600' : 'text-slate-900'}`}>{item.value}</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Action menu */}
-        <div className="space-y-3">
-          {isAdmin && (
-            <button onClick={() => navigate('/admin')}
-              className="w-full bg-gradient-to-r from-sky-600 to-cyan-500 rounded-2xl p-5 flex items-center justify-between shadow-nutrisea text-white">
-              <div className="flex items-center gap-3 font-black">
-                <div className="bg-white/20 p-2 rounded-xl"><LayoutDashboard size={18} /></div> Panel Posyandu
-              </div>
-              <ChevronRight size={18} />
-            </button>
-          )}
-
-          {[
-            { icon: History, label: 'Riwayat Gummy', action: () => setShowHistoryModal(true), color: false },
-            { icon: HelpCircle, label: 'Butuh Bantuan?', desc: 'Chat Posyandu', action: handleWA, color: false, extra: '💬' },
-            { icon: Info, label: 'Tentang NutriSea', desc: 'Versi 1.0.0', action: () => setShowAboutModal(true), color: false },
-          ].map(item => (
-            <button key={item.label} onClick={item.action}
-              className="w-full bg-white rounded-2xl p-5 flex items-center justify-between border border-sky-100 shadow-card hover:bg-sky-50 transition">
+                <ChevronRight size={20} />
+             </button>
+           )}
+           
+           <button onClick={() => setShowAboutModal(true)} className="w-full bg-white rounded-3xl p-5 border border-sky-100 shadow-card flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="bg-sky-100 p-2.5 rounded-xl"><item.icon size={18} className="text-sky-600" /></div>
-                <div className="text-left">
-                  <p className="font-black text-slate-900 text-sm">{item.label}</p>
-                  {item.desc && <p className="text-xs text-slate-500 font-semibold">{item.desc}</p>}
-                </div>
+                 <div className="bg-sky-100 p-2.5 rounded-xl text-sky-600"><Info size={18} /></div>
+                 <span className="font-black text-slate-700 text-sm">Tentang NutriSea</span>
               </div>
-              <ChevronRight size={16} className="text-slate-400" />
-            </button>
-          ))}
+              <ChevronRight size={18} className="text-slate-300" />
+           </button>
 
-          <button onClick={() => setShowLogoutModal(true)}
-            className="w-full bg-red-50 rounded-2xl p-5 flex items-center justify-between border border-red-100 hover:bg-red-100/60 transition shadow-sm">
-            <div className="flex items-center gap-3">
-              <div className="bg-white p-2.5 rounded-xl border border-red-100"><LogOut size={18} className="text-red-600" /></div>
-              <span className="font-black text-red-700">Keluar Sistem</span>
-            </div>
-            <ChevronRight size={16} className="text-red-300" />
-          </button>
+           <button onClick={() => setShowLogoutModal(true)} className="w-full bg-red-50 rounded-3xl p-5 text-red-600 flex items-center justify-between border border-red-100 shadow-sm">
+              <div className="flex items-center gap-3 font-black">
+                 <div className="bg-white p-2.5 rounded-xl"><LogOut size={18} /></div> Keluar Akun
+              </div>
+              <ChevronRight size={20} className="text-red-300" />
+           </button>
         </div>
       </div>
 
-      {/* Logout modal */}
+      {/* MODALS */}
       <Modal isOpen={showLogoutModal} onClose={() => setShowLogoutModal(false)} title="Konfirmasi Keluar"
         footer={<><Button variant="secondary" onClick={() => setShowLogoutModal(false)}>Batal</Button><Button variant="danger" onClick={handleLogout}>Keluar</Button></>}>
-        Apakah Anda yakin ingin keluar dari akun NutriSea Anda?
+        Apakah Bunda yakin ingin keluar dari aplikasi NutriSea?
       </Modal>
 
-      {/* History modal */}
-      <Modal isOpen={showHistoryModal} onClose={() => setShowHistoryModal(false)} title="Riwayat Konsumsi"
-        footer={<Button onClick={() => setShowHistoryModal(false)} className="bg-sky-600">Tutup</Button>}>
-        <div className="text-left max-h-64 overflow-y-auto space-y-2 scroll-area">
-          {recentLogs.length > 0 ? recentLogs.map(log => (
-            <div key={log.id} className="bg-sky-50 rounded-2xl p-3 border border-sky-100 shadow-sm">
-              <p className="font-black text-slate-900 text-sm">{log.medications?.name} {log.medications?.dosage}</p>
-              <p className="text-xs text-slate-500 font-semibold mt-0.5">{new Date(log.taken_at).toLocaleString('id-ID')}</p>
-            </div>
-          )) : <p className="text-center py-6 text-slate-400 text-sm">Belum ada riwayat konsumsi.</p>}
-        </div>
-      </Modal>
-
-      {/* About modal */}
-      <Modal isOpen={showAboutModal} onClose={() => setShowAboutModal(false)} title="Tentang NutriSea"
-        footer={<Button onClick={() => setShowAboutModal(false)} className="bg-sky-600">Tutup</Button>}>
+      <Modal isOpen={showAboutModal} onClose={() => setShowAboutModal(false)} title="Identitas NutriSea"
+        footer={<Button onClick={() => setShowAboutModal(false)}>Tutup</Button>}>
         <div className="text-center">
-          <div className="text-5xl mb-3">🐠</div>
-          <p className="font-bold text-slate-700 leading-relaxed text-sm">
-            <strong>NutriSea</strong> adalah inovasi sistem intervensi stunting berbasis pangan fungsional dummy dari fauna laut yang membantu pemantauan dan edukasi masyarakat secara real-time.
-          </p>
-          <div className="mt-4 bg-sky-50 rounded-2xl p-3 border border-sky-100">
-            <p className="text-xs text-slate-500 font-bold">Versi 1.0.0 · © 2026 NutriSea</p>
-            <p className="text-xs text-slate-500 font-semibold">Mengurangi angka stunting Indonesia dengan teknologi & gizi</p>
-          </div>
+           <p className="text-5xl mb-4">🐠</p>
+           <h4 className="font-black text-slate-900 text-lg mb-2">NutriSea App v1.2.0</h4>
+           <p className="text-sm text-slate-500 leading-relaxed font-semibold">
+             Inovasi Pencegahan Stunting Berbasis Gizi Fauna Laut. Membantu bunda memantau asupan NutriSea Gummy si kecil secara otomatis dan cerdas.
+           </p>
         </div>
       </Modal>
     </div>

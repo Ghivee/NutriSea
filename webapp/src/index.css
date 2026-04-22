@@ -20,10 +20,17 @@
 *, *::before, *::after { box-sizing: border-box; }
 
 html, body, #root {
-  height: 100%;
+  height: 100dvh;
+  width: 100%;
   margin: 0;
   padding: 0;
+  overflow: hidden;
 }
+
+body {
+  overscroll-behavior: none; /* Prevent elastic bounce showing background */
+}
+
 
 body {
   font-family: 'Nunito', -apple-system, BlinkMacSystemFont, sans-serif;
@@ -42,27 +49,33 @@ body {
 
 /* ============ AUTH SHELL ============ */
 .auth-outer {
-  min-height: 100dvh;
+  position: fixed;
+  inset: 0;
+  height: 100dvh;
   width: 100%;
   display: flex;
   align-items: stretch;
-  background: linear-gradient(135deg, #0369a1 0%, #0284c7 40%, #22d3ee 100%);
+  background: #ffffff;
   font-family: 'Nunito', -apple-system, sans-serif;
+  overflow: hidden;
+  z-index: 999;
 }
-/* Mobile: full screen card */
+/* Mobile: full screen card — scrollable when content overflows */
 .auth-card {
   width: 100%;
-  background: var(--surf);
+  background: #ffffff;
   display: flex;
   flex-direction: column;
+  height: 100dvh;
   overflow-y: auto;
-  min-height: 100dvh;
+  -webkit-overflow-scrolling: touch;
 }
 /* Desktop: side-by-side */
 @media (min-width: 1024px) {
   .auth-outer {
-    align-items: center;
-    justify-content: center;
+    align-items: stretch;
+    justify-content: flex-start;
+    border: none !important; /* REASON: Remove white frame in corners */
   }
   .auth-left-panel {
     display: flex;
@@ -72,16 +85,19 @@ body {
     padding: 3rem;
     flex-direction: column;
     gap: 2rem;
-    min-height: 100dvh;
+    height: 100dvh; /* height instead of min-height */
   }
   .auth-card {
     width: 440px;
     min-width: 440px;
-    max-height: 100dvh;
-    min-height: 100dvh;
+    height: 100dvh;
     border-radius: 0;
-    box-shadow: -20px 0 60px rgba(0,0,0,0.3);
+    box-shadow: none !important;
+    border: none !important;
+    background: #ffffff !important;
     overflow-y: auto;
+    position: relative;
+    z-index: 50;
   }
 }
 
@@ -138,11 +154,24 @@ input[type=range]::-webkit-slider-thumb {
 .shadow-card { box-shadow: 0 2px 16px rgba(15,23,42,0.08); }
 
 /* ============ ANIMATIONS ============ */
+/* ─── Region Selection Custom Styles ─── */
+.region-select {
+  @apply w-full bg-white border-2 border-sky-100 rounded-2xl px-4 py-3 text-slate-800 font-bold text-sm focus:outline-none focus:border-sky-600 transition-all shadow-sm cursor-pointer;
+}
+
+.region-select:disabled {
+  @apply bg-slate-50 border-slate-100 text-slate-300 cursor-not-allowed;
+}
+
+.region-input {
+  @apply w-full bg-white border-2 border-sky-100 rounded-2xl px-4 py-3 text-slate-900 font-bold text-sm focus:outline-none focus:border-sky-600 shadow-sm transition-all placeholder:text-slate-300;
+}
+
 @keyframes slideUp {
-  from { opacity: 0; transform: translateY(16px); }
+  from { opacity: 0; transform: translateY(20px); }
   to { opacity: 1; transform: translateY(0); }
 }
-.animate-slideUp { animation: slideUp 0.25s ease; }
+.animate-slideUp { animation: slideUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
 
 @keyframes fadeIn {
   from { opacity: 0; }

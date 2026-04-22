@@ -21,8 +21,8 @@ const Edukasi = () => {
   const fetchData = useCallback(async () => {
     setError('');
     try {
-      const { data } = await supabase.from('educational_articles')
-        .select('*').eq('is_published', true).order('created_at', { ascending: false });
+      const { data } = await supabase.from('educational_content')
+        .select('*').eq('type', 'article').order('created_at', { ascending: false });
       setArticles(data?.length > 0 ? data : FALLBACK_ARTICLES);
     } catch (err) {
       setError('Gagal memuat konten. Menampilkan konten bawaan.');

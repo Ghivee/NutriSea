@@ -6,10 +6,10 @@ import { useAuth } from '../contexts/AuthContext';
 import logoSrc from '../assets/Nutrisea_Logo.PNG';
 
 const NutriSeaLogo = () => (
-  <img 
-    src={logoSrc} 
-    alt="NutriSea" 
-    className="h-10 w-auto object-contain" 
+  <img
+    src={logoSrc}
+    alt="NutriSea"
+    className="h-14 w-auto object-contain transform scale-[3] origin-left"
   />
 );
 
@@ -22,6 +22,8 @@ const navItems = [
   { to: '/profil', icon: UserCircle2, label: 'Profil' },
 ];
 
+const adminNavItem = { to: '/admin', icon: LayoutDashboard, label: 'Dashboard' };
+
 const BottomNav = () => {
   const { isAdmin } = useAuth();
   const navigate = useNavigate();
@@ -31,6 +33,7 @@ const BottomNav = () => {
       {/* ─── Mobile: Bottom bar ─── */}
       <div className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-xl border-t border-sky-100 pb-safe shadow-nutrisea-sm">
         <div className="flex justify-around px-1 py-2">
+          {/* Main items */}
           {navItems.map(item => (
             <NavLink key={item.to} to={item.to} end={item.end}
               className={({ isActive }) =>
@@ -61,8 +64,7 @@ const BottomNav = () => {
           {navItems.map(item => (
             <NavLink key={item.to} to={item.to} end={item.end}
               className={({ isActive }) =>
-                `flex items-center gap-3 px-4 py-3 rounded-2xl font-bold text-sm transition-all ${
-                  isActive ? 'bg-sky-600 text-white shadow-nutrisea-sm' : 'text-slate-600 hover:bg-sky-50'
+                `flex items-center gap-3 px-4 py-3 rounded-2xl font-bold text-sm transition-all ${isActive ? 'bg-sky-600 text-white shadow-nutrisea-sm' : 'text-slate-600 hover:bg-sky-50'
                 }`
               }>
               <item.icon size={18} /> {item.label}

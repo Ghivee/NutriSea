@@ -4,8 +4,8 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { Alert, Modal, Button, Badge } from '../../components/UIComponents';
 
-const emptyArticle = { title: '', content: '', category: 'umum', is_published: true };
-const emptyTip = { content: '', is_active: true };
+const emptyArticle = { title: '', content: '', category: 'umum' };
+const emptyTip = { content: '' };
 const categories = ['umum', 'stunting', 'nutrisi', 'tumbuh-kembang'];
 
 const AdminEdukasi = () => {
@@ -27,14 +27,11 @@ const AdminEdukasi = () => {
   const fetchAll = useCallback(async () => {
     setError('');
     try {
-      const [artRes, tipRes] = await Promise.all([
-        supabase.from('educational_articles').select('*').order('created_at', { ascending: false }),
-        supabase.from('daily_tips').select('*').order('created_at', { ascending: false })
-      ]);
-      if (artRes.error) throw new Error('Gagal memuat artikel: ' + artRes.error.message);
-      if (tipRes.error && tipRes.error.code !== '42P01') throw new Error('Gagal memuat tips: ' + tipRes.error.message);
-      setArticles(artRes.data || []);
-      setTips(tipRes.data || []);
+      const { data, error } = await supabase.from('educational_content').select('*').order('created_at', { ascending: false });
+      if (error) throw new Error('Gagal memuat konten: ' + error.message);
+      
+      setArticles(data?.filter(i => i.type === 'article') || []);
+      setTips(data?.filter(i => i.type === 'tips') || []);
     } catch (err) { setError(err.message); } finally { setLoading(false); }
   }, []);
 
@@ -43,7 +40,7 @@ const AdminEdukasi = () => {
 
   const openArticleForm = (a = null) => {
     setEditId(a?.id || null);
-    setForm(a ? { title: a.title, content: a.content, category: a.category, is_published: a.is_published } : { ...emptyArticle });
+    setForm(a ? { title: a.title, content: a.content, category: a.category } : { ...emptyArticle });
     setShowForm(true); setError('');
   };
 
@@ -53,34 +50,26 @@ const AdminEdukasi = () => {
     if (!form.content.trim()) { setError('Konten artikel wajib diisi.'); return; }
     setSaving(true); setError('');
     try {
-      const payload = { ...form, author_id: profile?.id };
+      const payload = { title: form.title, content: form.content, category: form.category, type: 'article', author: profile?.full_name || 'Admin' };
       const { error: err } = editId
-        ? await supabase.from('educational_articles').update(payload).eq('id', editId)
-        : await supabase.from('educational_articles').insert(payload);
+        ? await supabase.from('educational_content').update(payload).eq('id', editId)
+        : await supabase.from('educational_content').insert(payload);
       if (err) throw new Error((editId ? 'Gagal memperbarui' : 'Gagal menambah') + ' artikel: ' + err.message);
       setShowForm(false); setEditId(null);
       await fetchAll();
     } catch (err) { setError(err.message); } finally { setSaving(false); }
   };
 
-  const togglePublish = async (id, cur) => {
-    const { error } = await supabase.from('educational_articles').update({ is_published: !cur }).eq('id', id);
-    if (error) setError('Gagal mengubah status: ' + error.message);
-    else fetchAll();
-  };
-
   const deleteItem = async () => {
     if (!deleteModal) return;
-    const table = deleteModal.type === 'article' ? 'educational_articles' : 'daily_tips';
-    const { error } = await supabase.from(table).delete().eq('id', deleteModal.id);
+    const { error } = await supabase.from('educational_content').delete().eq('id', deleteModal.id);
     if (error) setError('Gagal menghapus: ' + error.message);
     else { setDeleteModal(null); fetchAll(); }
   };
 
-  // TIPS CRUD
   const openTipForm = (t = null) => {
     setEditTipId(t?.id || null);
-    setTipForm(t ? { content: t.content, is_active: t.is_active } : { ...emptyTip });
+    setTipForm(t ? { content: t.content } : { ...emptyTip });
     setShowTipForm(true); setError('');
   };
 
@@ -89,10 +78,10 @@ const AdminEdukasi = () => {
     if (!tipForm.content.trim()) { setError('Konten tips wajib diisi.'); return; }
     setSaving(true); setError('');
     try {
-      const payload = { ...tipForm, author_id: profile?.id };
+      const payload = { title: 'Tips Harian', content: tipForm.content, type: 'tips', author: profile?.full_name || 'Admin', category: 'tips' };
       const { error: err } = editTipId
-        ? await supabase.from('daily_tips').update(payload).eq('id', editTipId)
-        : await supabase.from('daily_tips').insert(payload);
+        ? await supabase.from('educational_content').update(payload).eq('id', editTipId)
+        : await supabase.from('educational_content').insert(payload);
       if (err) throw new Error((editTipId ? 'Gagal memperbarui' : 'Gagal menambah') + ' tips: ' + err.message);
       setShowTipForm(false); setEditTipId(null);
       await fetchAll();
@@ -106,7 +95,7 @@ const AdminEdukasi = () => {
   );
 
   return (
-    <div>
+    <div className="animate-slideUp">
       <div className="bg-gradient-to-br from-sky-600 to-cyan-500 rounded-2xl p-8 mb-6 shadow-nutrisea text-white">
         <h3 className="text-3xl font-black text-white tracking-tight mb-1">Edukasi & Konten</h3>
         <p className="text-white/80 font-semibold text-sm">Kelola artikel edukasi dan tips harian untuk Bunda NutriSea.</p>
@@ -172,25 +161,22 @@ const AdminEdukasi = () => {
           )}
 
           {articles.length === 0 ? (
-            <div className="bg-white rounded-2xl p-12 text-center border border-sky-100">
+            <div className="bg-white rounded-2xl p-12 text-center border border-sky-100 shadow-nutrisea-sm">
               <BookOpen size={40} className="text-sky-300 mx-auto mb-3" />
               <p className="font-bold text-slate-400">Belum ada artikel. Tambahkan artikel pertama!</p>
             </div>
           ) : articles.map(a => (
-            <div key={a.id} className={`bg-white rounded-2xl p-5 mb-3 border-2 ${a.is_published ? 'border-sky-50' : 'border-slate-100 opacity-70'}`}>
+            <div key={a.id} className="bg-white rounded-2xl p-5 mb-3 border border-sky-50 shadow-nutrisea-sm hover:shadow-md transition-all">
               <div className="flex items-start justify-between gap-3 mb-2">
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-1 flex-wrap">
                     <Badge color="sky">{a.category || 'umum'}</Badge>
-                    <Badge color={a.is_published ? 'green' : 'slate'}>{a.is_published ? 'Dipublikasikan' : 'Draf'}</Badge>
+                    <span className="text-[10px] text-slate-300 font-black uppercase tracking-widest">{new Date(a.created_at).toLocaleDateString()}</span>
                   </div>
                   <h4 className="font-black text-slate-900">{a.title}</h4>
                   <p className="text-xs text-slate-500 font-semibold mt-1 line-clamp-2">{a.content.substring(0, 120)}...</p>
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
-                  <button onClick={() => togglePublish(a.id, a.is_published)} className="p-1.5 rounded-xl hover:bg-sky-50 text-slate-400 hover:text-sky-600 transition">
-                    {a.is_published ? <EyeOff size={14} /> : <Eye size={14} />}
-                  </button>
                   <button onClick={() => openArticleForm(a)} className="p-1.5 rounded-xl hover:bg-sky-50 text-slate-400 hover:text-sky-600 transition"><Edit3 size={14} /></button>
                   <button onClick={() => setDeleteModal({ id: a.id, type: 'article' })} className="p-1.5 rounded-xl hover:bg-red-50 text-slate-400 hover:text-red-600 transition"><Trash2 size={14} /></button>
                 </div>
@@ -202,10 +188,10 @@ const AdminEdukasi = () => {
 
       {/* ─── TIPS TAB ─── */}
       {tab === 'tips' && (
-        <div>
+        <div className="animate-slideUp">
           <div className="bg-sky-50 rounded-2xl p-4 mb-4 border border-sky-100 flex items-start gap-3">
             <Lightbulb size={20} className="text-sky-600 mt-0.5 shrink-0" />
-            <p className="text-sm text-slate-600 font-semibold">Tips harian muncul di halaman <strong>Beranda</strong> Bunda sebagai motivasi dan informasi edukasi. Hanya 1 tip terbaru yang ditampilkan.</p>
+            <p className="text-sm text-slate-600 font-semibold">Tips harian muncul di halaman <strong>Beranda</strong> Bunda sebagai motivasi singkat harian.</p>
           </div>
 
           <div className="flex justify-end mb-4">
@@ -238,19 +224,19 @@ const AdminEdukasi = () => {
           )}
 
           {tips.length === 0 ? (
-            <div className="bg-white rounded-2xl p-12 text-center border border-sky-100">
+            <div className="bg-white rounded-2xl p-12 text-center border border-sky-100 shadow-nutrisea-sm">
               <Lightbulb size={40} className="text-sky-300 mx-auto mb-3" />
-              <p className="font-bold text-slate-400">Belum ada tips. Tambahkan tips pertama!</p>
+              <p className="font-bold text-slate-400">Belum ada tips harian. Jadilah yang pertama memberi inspirasi!</p>
             </div>
           ) : tips.map((t, idx) => (
-            <div key={t.id} className={`bg-white rounded-2xl p-5 mb-3 border-2 ${t.is_active ? 'border-sky-50' : 'border-slate-100 opacity-60'}`}>
+            <div key={t.id} className="bg-white rounded-2xl p-5 mb-3 border border-sky-50 shadow-nutrisea-sm hover:shadow-md transition-all">
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-start gap-3 flex-1">
                   <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${idx === 0 ? 'bg-sky-600' : 'bg-sky-100'}`}>
                     <Lightbulb size={14} className={idx === 0 ? 'text-white' : 'text-sky-600'} />
                   </div>
                   <div>
-                    {idx === 0 && t.is_active && <span className="text-[10px] font-black text-sky-600 bg-sky-100 px-2 py-0.5 rounded-full block w-fit mb-1">DITAMPILKAN SEKARANG</span>}
+                    {idx === 0 && <span className="text-[10px] font-black text-sky-600 bg-sky-100 px-2 py-0.5 rounded-full block w-fit mb-1">TIPS TERBARU</span>}
                     <p className="text-sm font-semibold text-slate-900 leading-relaxed">{t.content}</p>
                   </div>
                 </div>
@@ -266,7 +252,7 @@ const AdminEdukasi = () => {
 
       <Modal isOpen={!!deleteModal} onClose={() => setDeleteModal(null)} title={`Hapus ${deleteModal?.type === 'article' ? 'Artikel' : 'Tips'}?`}
         footer={<><Button variant="secondary" onClick={() => setDeleteModal(null)}>Batal</Button><Button variant="danger" onClick={deleteItem}>Hapus</Button></>}>
-        {deleteModal?.type === 'article' ? 'Artikel ini akan dihapus permanen.' : 'Tips ini akan dihapus dan tidak muncul di beranda Bunda.'}
+        {deleteModal?.type === 'article' ? 'Artikel ini akan dihapus permanen.' : 'Tips ini akan dihapus dan tidak muncul lagi di beranda Bunda.'}
       </Modal>
     </div>
   );

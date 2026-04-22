@@ -3,11 +3,10 @@ import { Navigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import logoSrc from '../assets/Nutrisea_Logo.PNG';
 
-// NutriSea loading screen
 const LoadingScreen = () => (
   <div className="h-dvh flex items-center justify-center bg-sky-50">
     <div className="flex flex-col items-center gap-4">
-      <img src={logoSrc} alt="NutriSea" className="w-20 h-auto object-contain animate-pulse" />
+      <img src={logoSrc} alt="NutriSea" className="w-30 h-auto object-contain animate-pulse" />
 
       <div className="w-8 h-8 rounded-full animate-spin"
         style={{ border: '4px solid #e0f2fe', borderTopColor: '#0284c7' }} />

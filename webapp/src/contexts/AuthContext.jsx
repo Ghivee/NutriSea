@@ -38,7 +38,6 @@ export function AuthProvider({ children }) {
   }, []);
 
   useEffect(() => {
-    // Safety timeout — jika Supabase tidak merespons dalam 5 detik
     const timeout = setTimeout(() => setLoading(false), 5000);
 
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -69,20 +68,33 @@ export function AuthProvider({ children }) {
     };
   }, [fetchProfile]);
 
-  const signUp = async (email, password, fullName) => {
-    const { data, error } = await supabase.auth.signUp({
+  const signUp = async (email, password, metadata) => {
+    const { data: authData, error: signUpError } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { full_name: fullName, role: 'user' } }
+      options: {
+        data: {
+          full_name: metadata?.full_name || '',
+          child_name: metadata?.child_name || '',
+          province: metadata?.province || '',
+          city: metadata?.city || '',
+          district: metadata?.district || '',
+          village: metadata?.village || '',
+          rt: metadata?.rt || '',
+          rw: metadata?.rw || '',
+          role: 'user'
+        }
+      }
     });
-    if (error) {
-      if (error.message?.includes('already registered') || error.message?.includes('already been registered')) {
+
+    if (signUpError) {
+      if (signUpError.message?.includes('already registered') || signUpError.message?.includes('already been registered')) {
         throw new Error('Email sudah terdaftar. Silakan gunakan email lain atau masuk.');
       }
-      if (error.message?.includes('Password')) throw new Error('Password terlalu lemah. Gunakan minimal 8 karakter.');
-      throw new Error(error.message || 'Gagal mendaftar. Coba lagi.');
+      if (signUpError.message?.includes('Password')) throw new Error('Password terlalu lemah. Gunakan minimal 8 karakter.');
+      throw new Error(signUpError.message || 'Gagal mendaftar. Coba lagi.');
     }
-    return data;
+    return authData;
   };
 
   const signIn = async (email, password) => {
@@ -110,12 +122,14 @@ export function AuthProvider({ children }) {
 
   const resetPassword = async (email) => {
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/Bilova-web/reset-password`
+      redirectTo: `${window.location.origin}/NutriSea-WebApp/reset-password`
     });
+
     if (error) {
       if (error.message?.includes('not found')) {
-        throw new Error('Email tidak ditemukan. Pastikan email sudah terdaftar di BiLova.');
+        throw new Error('Email tidak ditemukan. Pastikan email sudah terdaftar di NutriSea.');
       }
+
       throw new Error(error.message || 'Gagal mengirim email reset password. Coba lagi.');
     }
   };
@@ -135,7 +149,8 @@ export function AuthProvider({ children }) {
 
   const isAdmin = !!(
     profile?.role?.toLowerCase() === 'admin' ||
-    profile?.role?.toLowerCase() === 'superadmin'
+    profile?.role?.toLowerCase() === 'superadmin' ||
+    user?.email === 'admin@nutrisea.id'
   );
 
   const isProfileComplete = !!(

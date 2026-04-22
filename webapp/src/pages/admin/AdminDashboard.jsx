@@ -16,14 +16,11 @@ const AdminDashboard = () => {
     const fetchStats = async () => {
       setError('');
       try {
-        // Fetch all in parallel
         const [usersRes, medsRes, logsRes, symptomRes] = await Promise.all([
           supabase.from('profiles').select('id, full_name, email, created_at').eq('role', 'user').order('created_at', { ascending: false }),
           supabase.from('medications').select('user_id').eq('is_active', true),
-          // Get compliance logs for this month
           supabase.from('compliance_logs').select('user_id, taken_at').eq('status', 'taken')
             .gte('taken_at', new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString()),
-          // Pertumbuhan/Gejala in last 30 days containing [EMERGENCY] or [WARNING]
           supabase.from('symptom_logs').select('*, profiles(full_name)').not('notes', 'like', '%NORMAL%')
             .gte('created_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
             .order('created_at', { ascending: false }).limit(10)
@@ -33,12 +30,10 @@ const AdminDashboard = () => {
         const logs = logsRes.data || [];
         const syms = symptomRes.data || [];
 
-        // Compute avg compliance: (logs this month / (active meds * days passed))
         const daysInMonth = new Date().getDate();
         const totalExpected = (medsRes.data?.length || 0) * daysInMonth;
         const avgCompliance = totalExpected > 0 ? Math.min(Math.round((logs.length / totalExpected) * 100), 100) : 0;
 
-        // Severe alerts = logs with EMERGENCY tag
         const severeCount = syms.filter(s => s.notes?.includes('[EMERGENCY]') || s.notes?.includes('[WARNING]')).length;
 
         setStats({
@@ -86,7 +81,7 @@ const AdminDashboard = () => {
 
   const cards = [
     {
-      label: 'Total Bunda', value: stats.totalUsers, sub: 'Terdaftar di Posyandu ini',
+      label: 'Total Balita', value: stats.totalUsers, sub: 'Terdaftar di Posyandu ini',
       icon: Users, iconBg: 'bg-sky-100', iconColor: 'text-sky-600',
     },
     {
@@ -151,7 +146,8 @@ const AdminDashboard = () => {
                       <div className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${isEmerg ? 'bg-red-500' : 'bg-amber-500'}`} />
                       <div className="flex-1 min-w-0">
                         <p className="font-bold text-slate-900 text-sm flex items-center gap-2">
-                          {log.profiles?.full_name || 'Anonim'} 
+                          {log.profiles?.child_name || 'Balita Anonim'} 
+                          <span className="text-[10px] text-slate-400 font-medium">(Bunda {log.profiles?.full_name || '-'})</span>
                           {log.severity && <span className="font-black text-xs text-red-600 px-1.5 py-0.5 bg-red-50 rounded-md border border-red-100">Status</span>}
                         </p>
                         <div className="flex items-center gap-2 mt-1.5 flex-wrap">
@@ -187,20 +183,20 @@ const AdminDashboard = () => {
         <div className="bg-white rounded-2xl border border-sky-100 shadow-card overflow-hidden">
           <div className="px-6 py-4 border-b border-sky-50 flex items-center gap-2">
             <Users size={16} className="text-sky-600" />
-            <h4 className="font-black text-slate-900">Bunda Terbaru</h4>
+            <h4 className="font-black text-slate-900">Pendaftaran Terbaru</h4>
           </div>
           {recentPatients.length > 0 ? (
             <div className="divide-y divide-sky-50">
               {recentPatients.map(p => {
-                const initials = p.full_name?.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase() || '?';
+                const initials = p.child_name?.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase() || '?';
                 return (
                   <div key={p.id} className="px-6 py-3 flex items-center gap-3 hover:bg-sky-50 transition-colors">
                     <div className="w-8 h-8 rounded-full bg-sky-100 flex items-center justify-center text-sky-600 font-black text-xs shrink-0">
                       {initials}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="font-bold text-slate-900 text-sm truncate">{p.full_name || '-'}</p>
-                      <p className="text-xs text-slate-400 font-semibold truncate">{p.email}</p>
+                      <p className="font-bold text-slate-900 text-sm truncate">{p.child_name || p.full_name}</p>
+                      <p className="text-xs text-slate-400 font-semibold truncate">Bunda: {p.full_name}</p>
                     </div>
                     <span className="text-[10px] text-slate-400 font-semibold shrink-0">
                       {new Date(p.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })}
@@ -210,7 +206,7 @@ const AdminDashboard = () => {
               })}
             </div>
           ) : (
-            <div className="px-6 py-8 text-center text-sm text-slate-400 font-bold">Belum ada bunda terdaftar.</div>
+            <div className="px-6 py-8 text-center text-sm text-slate-400 font-bold">Belum ada Balita terdaftar.</div>
           )}
         </div>
       </div>

@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { Mail, ArrowRight, ChevronLeft, ShieldCheck, HelpCircle } from 'lucide-react';
 import { Button, InputField, Alert, FloatingPills } from '../../components/UIComponents';
 import { useAuth } from '../../contexts/AuthContext';
-import logoSrc from '../../assets/Bilova_Logo.png';
+import logoSrc from '../../assets/Nutrisea_Logo.PNG';
 
 const WHATSAPP_SUPPORT = '6289690815134';
 
@@ -26,19 +26,19 @@ const ForgotPasswordScreen = () => {
   };
 
   const handleWASupport = () => {
-    const msg = `Halo Admin BiLova, mau tanya soal [ganti dengan masalahmu]. Bisa bantu?`;
+    const msg = `Halo Admin NutriSea, mau tanya soal [ganti dengan masalahmu]. Bisa bantu?`;
     window.open(`https://wa.me/${WHATSAPP_SUPPORT}?text=${encodeURIComponent(msg)}`, '_blank');
   };
 
   return (
     <div className="auth-outer">
       {/* Desktop left panel */}
-      <div className="auth-left-panel hidden lg:flex">
+      <div className="auth-left-panel hidden lg:flex" style={{ background: 'linear-gradient(135deg, #0284c7 0%, #0891b2 40%, #06b6d4 100%)' }}>
         <div className="relative z-10 text-white text-center max-w-sm">
-          <img src={logoSrc} alt="BiLova" className="w-32 h-auto object-contain mx-auto mb-5 brightness-0 invert" />
-          <h1 className="text-3xl font-black mb-3">Lupa Password?</h1>
+          <img src={logoSrc} alt="NutriSea" className="w-53 h-auto object-contain mx-auto mb-5 brightness-0 invert" />
+          <h1 className="text-3xl font-black mb-3 leading-tight">Lupa Password?</h1>
           <p className="text-white/80 text-sm leading-relaxed">
-            Tenang, kami akan membantu Anda memulihkan akses ke akun BiLova Anda dengan aman.
+            Tenang, kami akan membantu Anda memulihkan akses ke akun NutriSea Anda dengan aman.
           </p>
         </div>
       </div>
@@ -49,37 +49,39 @@ const ForgotPasswordScreen = () => {
           <FloatingPills />
 
           {/* Back */}
-          <Link to="/login" className="flex items-center gap-1 text-[#8B2C8C] font-bold text-sm mb-6 w-fit hover:text-[#C85CA0]">
+          <Link to="/login" className="flex items-center gap-1 text-sky-600 font-bold text-sm mb-6 w-fit hover:text-sky-700">
             <ChevronLeft size={18} /> Kembali
           </Link>
 
           <div className="flex justify-center mb-6">
-            <img src={logoSrc} alt="BiLova" className="h-14 w-auto object-contain" />
+            <img src={logoSrc} alt="NutriSea" className="h-43 w-auto object-contain" />
           </div>
+
 
           {success ? (
             <div className="flex-1 flex flex-col items-center justify-center text-center gap-4 animate-slideUp">
               <div className="text-6xl">📬</div>
-              <h2 className="text-2xl font-black text-[#2D1B3D]">Email Terkirim!</h2>
-              <p className="text-sm text-[#6B4B7B] font-semibold leading-relaxed max-w-xs">
+              <h2 className="text-2xl font-black text-slate-900">Email Terkirim!</h2>
+              <p className="text-sm text-slate-500 font-semibold leading-relaxed max-w-xs">
                 Instruksi reset password telah dikirim ke <strong>{email}</strong>. Periksa kotak masuk Anda.
               </p>
-              <Button onClick={() => window.location.href = '/Bilova-web/login'}>Kembali ke Halaman Masuk</Button>
+              <Button onClick={() => window.location.href = `${import.meta.env.BASE_URL}login`}>Kembali ke Halaman Masuk</Button>
             </div>
           ) : (
             <>
-              <h2 className="text-2xl font-black text-[#2D1B3D] mb-1">Atur Ulang Password</h2>
-              <p className="text-sm text-[#B090C0] font-semibold mb-6">
-                Masukkan email terdaftar. Kami akan kirimkan instruksi pemulihan akun.
+              <h2 className="text-2xl font-black text-slate-900 mb-1">Atur Ulang Password</h2>
+              <p className="text-sm text-slate-500 font-semibold mb-6">
+                Masukkan email terdaftar si kecil. Kami akan kirimkan instruksi pemulihan akun.
               </p>
 
               {error && <div className="mb-4"><Alert type="error" message={error} /></div>}
 
               <form onSubmit={handleSubmit} className="space-y-4 mb-6">
                 <div>
-                  <label className="text-xs font-black text-[#6B4B7B] uppercase tracking-wider mb-2 block">Alamat Email</label>
+                  <label className="text-xs font-black text-slate-500 uppercase tracking-wider mb-2 block">Alamat Email</label>
                   <InputField icon={Mail} type="email" placeholder="nama@email.com" value={email} onChange={e => setEmail(e.target.value)} />
                 </div>
+
                 <Button type="submit" disabled={loading}>
                   {loading ? <><span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />Mengirim...</>
                     : <><span>Kirim Instruksi Reset</span><ArrowRight size={16} /></>}
@@ -88,15 +90,15 @@ const ForgotPasswordScreen = () => {
 
               {/* Info cards */}
               <div className="grid grid-cols-2 gap-3 mb-4">
-                <div className="bg-[#EDD9F5]/50 rounded-2xl p-4 border border-[#EDD9F5]">
-                  <ShieldCheck size={22} className="text-[#8B2C8C] mb-2" />
-                  <h4 className="font-black text-[#2D1B3D] text-xs mb-1">Aman & Terenkripsi</h4>
-                  <p className="text-[10px] text-[#B090C0] font-semibold">Data medis Anda terlindungi selama proses pemulihan.</p>
+                <div className="bg-sky-50 rounded-2xl p-4 border border-sky-100">
+                  <ShieldCheck size={22} className="text-sky-600 mb-2" />
+                  <h4 className="font-black text-sky-900 text-xs mb-1">Aman & Terenkripsi</h4>
+                  <p className="text-[10px] text-sky-600/70 font-semibold">Data medis Anda terlindungi selama proses pemulihan.</p>
                 </div>
-                <div className="bg-[#EDD9F5]/50 rounded-2xl p-4 border border-[#EDD9F5]">
-                  <HelpCircle size={22} className="text-[#8B2C8C] mb-2" />
-                  <h4 className="font-black text-[#2D1B3D] text-xs mb-1">Butuh Bantuan?</h4>
-                  <p className="text-[10px] text-[#B090C0] font-semibold">Tim kami siap membantu Anda kembali ke akun.</p>
+                <div className="bg-sky-50 rounded-2xl p-4 border border-sky-100">
+                  <HelpCircle size={22} className="text-sky-600 mb-2" />
+                  <h4 className="font-black text-sky-900 text-xs mb-1">Butuh Bantuan?</h4>
+                  <p className="text-[10px] text-sky-600/70 font-semibold">Tim kami siap membantu Anda kembali ke akun.</p>
                 </div>
               </div>
 

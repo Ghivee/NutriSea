@@ -3,7 +3,7 @@ import { Pill, CheckCircle2, Clock, TrendingUp, Bell, Calendar, Lightbulb, Alert
 import { Button, SectionTitle, Alert } from '../../components/UIComponents';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
-import logoSrc from '../../assets/Bilova_Logo.png';
+import logoSrc from '../../assets/Nutrisea_Logo.PNG';
 
 const DAY_NAMES_SHORT = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
 
@@ -20,10 +20,10 @@ const Beranda = () => {
 
   const today = new Date();
   const firstName = profile?.full_name?.split(' ')[0] || 'Ibu';
+  const childName = profile?.child_name || 'Si Kecil';
   const hour = today.getHours();
   const greeting = hour < 12 ? 'Selamat Pagi' : hour < 17 ? 'Selamat Siang' : 'Selamat Malam';
 
-  // Build weekly calendar
   useEffect(() => {
     const start = new Date(today);
     start.setDate(today.getDate() - ((today.getDay() + 6) % 7)); // Monday start
@@ -48,7 +48,7 @@ const Beranda = () => {
       const [medRes, logRes, tipRes] = await Promise.all([
         supabase.from('medications').select('*').eq('is_active', true).eq('user_id', profile.id).order('created_at'),
         supabase.from('compliance_logs').select('medication_id').gte('taken_at', startOfDay.toISOString()).eq('status', 'taken').eq('user_id', profile.id),
-        supabase.from('daily_tips').select('*').eq('is_active', true).order('created_at', { ascending: false }).limit(1).single()
+        supabase.from('educational_content').select('*').eq('type', 'tips').order('created_at', { ascending: false }).limit(1).single()
       ]);
       if (medRes.error && medRes.error.code !== 'PGRST116') throw new Error('Gagal memuat jadwal NutriSea.');
       if (medRes.data) setMedications(medRes.data);
@@ -72,7 +72,6 @@ const Beranda = () => {
     setLoadingMed(medicationId);
     setError('');
     try {
-      // Check if already logged today
       const startOfDay = new Date(); startOfDay.setHours(0, 0, 0, 0);
       const { data: existing } = await supabase.from('compliance_logs')
         .select('id').eq('medication_id', medicationId).eq('user_id', profile.id)
@@ -100,7 +99,7 @@ const Beranda = () => {
     <div className="min-h-full">
       {/* Header */}
       <div className="sticky top-0 z-20 bg-sky-50/95 backdrop-blur-md border-b border-sky-100 px-5 py-3.5 flex items-center justify-between">
-        <img src={logoSrc} alt="NutriSea" className="h-9 w-auto object-contain" />
+        <img src={logoSrc} alt="NutriSea" className="h-14 w-auto object-contain transform scale-[3] origin-left" />
         <div className="flex items-center gap-2">
           {medications.length > 0 && (
             <div className="relative">
@@ -116,8 +115,8 @@ const Beranda = () => {
       <div className="px-5 pt-4 pb-24 lg:pb-8 space-y-5">
         {/* Greeting */}
         <div>
-          <p className="text-sm text-slate-400 font-bold">{greeting}, {firstName} 👋</p>
-          <h1 className="text-xl font-black text-slate-900">Perkembangan Si Kecil</h1>
+          <p className="text-sm text-slate-400 font-bold">{greeting}, Bunda {firstName} 👋</p>
+          <h1 className="text-xl font-black text-slate-900">Apa kabar {childName} hari ini?</h1>
         </div>
 
         {error && <Alert type="error" message={error} />}
@@ -153,10 +152,9 @@ const Beranda = () => {
           </div>
           <div className="flex gap-2 overflow-x-auto hide-scrollbar pb-1">
             {calendarDays.map((d, i) => (
-              <div key={i} className={`flex-shrink-0 w-12 h-16 rounded-2xl flex flex-col items-center justify-center gap-0.5 border-2 transition-all ${
-                d.isToday ? 'bg-sky-600 border-sky-600 shadow-nutrisea-sm' :
-                d.isPast ? 'bg-sky-100 border-sky-200' : 'bg-white border-sky-100'
-              }`}>
+              <div key={i} className={`flex-shrink-0 w-12 h-16 rounded-2xl flex flex-col items-center justify-center gap-0.5 border-2 transition-all ${d.isToday ? 'bg-sky-600 border-sky-600 shadow-nutrisea-sm' :
+                  d.isPast ? 'bg-sky-100 border-sky-200' : 'bg-white border-sky-100'
+                }`}>
                 <span className={`text-[9px] font-black ${d.isToday ? 'text-sky-100' : 'text-slate-400'}`}>{d.day}</span>
                 <span className={`text-base font-black ${d.isToday ? 'text-white' : 'text-slate-900'}`}>{d.date}</span>
                 <div className="h-2 flex items-center">
